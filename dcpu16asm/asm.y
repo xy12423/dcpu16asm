@@ -72,7 +72,7 @@ term : arg { proc->result = $1; }
 
 %%
 
-int8_t lexer_state_op[][27] = {
+int8_t lexer_state_arg[][27] = {
 	{1,2,3,0,13,0,0,0,7,8,0,0,0,0,0,9,0,0,11,0,0,0,0,4,5,6,0,},
 	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-1,},
 	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-2,},
@@ -82,14 +82,25 @@ int8_t lexer_state_op[][27] = {
 	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-6,},
 	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-7,},
 	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-8,},
-	{0,0,10,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,},
+	{0,0,10,0,20,0,0,0,23,0,0,0,0,0,18,0,0,0,0,0,15,0,0,0,0,0,0,},
 	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-9,},
 	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,12,0,0,0,0,0,0,0,0,0,0,0,},
 	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-10,},
 	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,14,0,0,0,},
 	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-11,},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,16,0,0,0,0,0,0,0,0,},
+	{0,0,0,0,0,0,0,17,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-12,},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,19,0,0,0,0,0,0,0,0,0,0,0,},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-13,},
+	{0,0,0,0,21,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,},
+	{0,0,0,0,0,0,0,0,0,0,22,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-14,},
+	{0,0,24,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,},
+	{0,0,0,0,0,0,0,0,0,0,25,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-15,},
 };
-uint8_t lexer_state_op_final[] = { 0,0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x1C,0x1B,0x1D, };
+uint8_t lexer_state_arg_final[] = { 0,0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x1C,0x1B,0x1D,0x17,0x18,0x19,0x1A };
 
 uint16_t read_num(asm_yacc_proc& proc)
 {
@@ -97,56 +108,77 @@ uint16_t read_num(asm_yacc_proc& proc)
 	char *num_end;
 	uint16_t result = static_cast<uint16_t>(std::strtol(itr, &num_end, 0));
 	if (num_end == itr || num_end > itr_end)
-		throw(assembler_error());
+		throw(assembler_error("Invalid operand"));
 	if (errno == ERANGE)
 	{
 		errno = 0;
-		throw(assembler_error());
+		throw(assembler_error("Invalid operand"));
 	}
 	proc.itr = num_end;
 	return result;
 }
 
-int read_reg(asm_yacc_proc& proc, uint16_t& ret)
+int read_arg(asm_yacc_proc& proc, uint16_t& ret)
 {
 	constexpr int state_default = 26;
 	const char *itr = proc.itr, *itr_end = proc.itr_end;
 	int state = 0;
 	do
 	{
-		if (itr == itr_end)
-			return 0;
-		if (!isalpha(*itr))
-			return 0;
-		state = lexer_state_op[state][toupper(*itr) - 'A'];
-		if (state == 0)
+		int new_state;
+		if (itr == itr_end || !isalpha(*itr))
 		{
-			state = lexer_state_op[state][state_default];
-			if (state == 0)
+			new_state = lexer_state_arg[state][state_default];
+			if (new_state == 0)
 				return 0;
-			else if (state < 0)
+		}
+		else
+		{
+			new_state = lexer_state_arg[state][toupper(*itr) - 'A'];
+			if (new_state == 0)
 			{
-				ret = lexer_state_op_final[-state];
-				proc.itr = itr;
-				if (ret > 0x7)
-					return SPEC_REG;
-				else
-					return REG;
+				new_state = lexer_state_arg[state][state_default];
+				if (new_state == 0)
+					return 0;
 			}
 		}
+		if (new_state < 0)
+		{
+			ret = lexer_state_arg_final[-new_state];
+			proc.itr = itr;
+			switch (ret)
+			{
+				case 0x17:
+					ret = 0x18;
+					return PUSH;
+				case 0x18:
+					return POP;
+				case 0x19:
+					return PEEK;
+				case 0x1A:
+					return PICK;
+				default:
+					if (ret > 0x7)
+						return SPEC_REG;
+					else
+						return REG;
+			}
+		}
+		state = new_state;
 		itr++;
 	} while (state > 0);
+	return 0;
 }
 
 int read_letters(asm_yacc_proc& proc, uint16_t& ret)
 {
-	int token = read_reg(proc, ret);
+	int token = read_arg(proc, ret);
 	if (token != 0)
 		return token;
 	
 	const char *itr = proc.itr, *itr_end = proc.itr_end;
 	for (; itr != itr_end; itr++)
-		if (!isalnum(*itr))
+		if (!isalnum(*itr) && *itr != '_')
 			break;
 	
 	std::string symbol(proc.itr, itr);
@@ -242,13 +274,16 @@ int yylex(YYSTYPE* lvalp, asm_yacc_proc* proc)
 				result = read_letters(*proc, ret);
 				if (result == NUMBER)
 					lvalp->data = ret;
-				else if (result == REG)
+				else
 				{
-					itr = proc->itr;
-					itr_end = proc->itr_end;
-					if (itr < itr_end && (*itr == '+' || *itr == '-'))
-						result = REG_SHIFT_ALLOWED;
-					lvalp->res = ret;
+					lvalp->res = static_cast<uint8_t>(ret);
+					if (result == REG)
+					{
+						itr = proc->itr;
+						itr_end = proc->itr_end;
+						if (itr < itr_end && (*itr == '+' || *itr == '-'))
+							result = REG_SHIFT_ALLOWED;
+					}
 				}
 				return result;
 			}
@@ -261,5 +296,5 @@ int yylex(YYSTYPE* lvalp, asm_yacc_proc* proc)
 
 void yyerror(asm_yacc_proc* proc, const char* err)
 {
-	throw(assembler_error());
+	throw(assembler_error("Invalid operand"));
 }

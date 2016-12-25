@@ -21,4 +21,5 @@
 #include <algorithm>
 #include <functional>
 #include <limits>
+#include <memory>
 #include <utility>
